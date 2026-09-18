@@ -150,7 +150,7 @@
 
   <script>
     // ⚠️ À MODIFIER : colle ici l'URL de ton déploiement Apps Script (se termine par /exec)
-    var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwpyiGTxLpxHcdzwXnJ21QRtRCwoal1NlfpASCz56oGoVhXjFvrX5mZFBYDe5bQxl8V/exec';
+    var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/COLLE_TON_ID_ICI/exec';
 
     var currentIsbn = null;
     var scanner = null;
@@ -185,7 +185,7 @@
     }
 
     function lookupManual() {
-      var v = document.getElementById('manualIsbn').value.trim();
+      var v = document.getElementById('manualIsbn').value.trim().replace(/[^0-9Xx]/g, '');
       if (v) handleIsbn(v);
     }
 
@@ -215,10 +215,10 @@
             fetchFromOpenLibrary(isbn);
           }
         })
-        .catch(function() { fetchFromOpenLibrary(isbn); });
+        .catch(function(err) { fetchFromOpenLibrary(isbn, err); });
     }
 
-    function fetchFromOpenLibrary(isbn) {
+    function fetchFromOpenLibrary(isbn, previousErr) {
       fetch('https://openlibrary.org/api/books?bibkeys=ISBN:' + isbn + '&jscmd=data&format=json')
         .then(function(r) { return r.json(); })
         .then(function(data) {
@@ -238,9 +238,9 @@
             showStatus('Livre non trouvé automatiquement — complète les champs à la main.', 'warn');
           }
         })
-        .catch(function() {
+        .catch(function(err) {
           fillForm({ isbn: isbn, titre: '', auteur: '', genre: '', resume: '', jaquette: '' });
-          showStatus('Impossible de contacter les bases de données — complète à la main.', 'err');
+          showStatus('Erreur technique : ' + (previousErr ? previousErr.message + ' / ' : '') + err.message, 'err');
         });
     }
 
