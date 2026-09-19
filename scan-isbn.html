@@ -48,13 +48,14 @@
       gap: 8px;
       margin-top: 12px;
     }
-    input[type=text], textarea {
+    input[type=text], textarea, select {
       width: 100%;
       padding: 8px;
       border: 1px solid #ccc;
       border-radius: 6px;
       font-family: Arial, sans-serif;
       font-size: 14px;
+      background: white;
     }
     textarea { resize: vertical; min-height: 60px; }
     label {
@@ -137,8 +138,13 @@
         <input type="text" id="auteur">
       </div>
     </div>
+    <label>Type</label>
+    <select id="type">
+      <option value="Livre">Livre</option>
+      <option value="BD">BD</option>
+    </select>
     <label>Genre</label>
-    <input type="text" id="genre" placeholder="Ex: Roman, BD, Jeunesse, Policier...">
+    <input type="text" id="genre" placeholder="Ex: Roman, Jeunesse, Policier...">
     <label>Résumé</label>
     <textarea id="resume"></textarea>
     <div class="actions">
@@ -220,8 +226,11 @@
 
     function fetchFromOpenLibrary(isbn, previousErr) {
       fetch('https://openlibrary.org/api/books?bibkeys=ISBN:' + isbn + '&jscmd=data&format=json')
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
+        .then(function(r) { return r.text(); })
+        .then(function(text) {
+          var data = {};
+          try { data = text ? JSON.parse(text) : {}; } catch (parseErr) { data = {}; }
+
           var key = 'ISBN:' + isbn;
           if (data[key]) {
             var b = data[key];
@@ -239,8 +248,9 @@
           }
         })
         .catch(function(err) {
+          // Vraie erreur réseau (pas de connexion, etc.) : là on informe vraiment
           fillForm({ isbn: isbn, titre: '', auteur: '', genre: '', resume: '', jaquette: '' });
-          showStatus('Erreur technique : ' + (previousErr ? previousErr.message + ' / ' : '') + err.message, 'err');
+          showStatus('Pas de connexion aux bases de données (' + err.message + ') — complète à la main.', 'err');
         });
     }
 
@@ -260,6 +270,7 @@
         isbn: document.getElementById('resultCard').dataset.isbn,
         titre: document.getElementById('titre').value,
         auteur: document.getElementById('auteur').value,
+        type: document.getElementById('type').value,
         genre: document.getElementById('genre').value,
         resume: document.getElementById('resume').value,
         jaquette: document.getElementById('cover').src
@@ -295,6 +306,7 @@
       currentIsbn = null;
       document.getElementById('resultCard').classList.add('hidden');
       document.getElementById('manualIsbn').value = '';
+      document.getElementById('type').value = 'Livre';
       document.getElementById('status').innerHTML = '';
     }
 
