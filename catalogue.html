@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Bibliothèque CE</title>
+<style>
+  :root {
+    --primary: #2E5B8A;
+    --primary-dark: #1f3f60;
+    --bg: #f4f6f9;
+    --card: #ffffff;
+    --ok: #2e8a4d;
+    --warn: #b8860b;
+    --busy: #c0392b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: Arial, Helvetica, sans-serif;
+    background: var(--bg);
+    margin: 0;
+    padding: 0 16px 40px;
+    color: #222;
+  }
+  header {
+    padding: 20px 0 10px;
+  }
+  h1 {
+    font-size: 22px;
+    color: var(--primary-dark);
+    margin: 0 0 4px 0;
+  }
+  .subtitle {
+    color: #666;
+    font-size: 13px;
+  }
+  .controls {
+    background: var(--card);
+    border-radius: 10px;
+    padding: 14px;
+    margin: 16px 0;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .controls input[type=text] {
+    flex: 1 1 220px;
+    padding: 9px 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  .controls select {
+    padding: 9px 10px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+    background: white;
+  }
+  .count {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 10px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: var(--card);
+    border-radius: 10px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    cursor: pointer;
+    transition: transform 0.15s;
+    display: flex;
+    flex-direction: column;
+  }
+  .card:hover { transform: translateY(-2px); }
+  .card img {
+    width: 100%;
+    aspect-ratio: 2/3;
+    object-fit: cover;
+    background: #ddd;
+  }
+  .card-body {
+    padding: 8px 10px 10px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+  }
+  .card-title {
+    font-size: 13px;
+    font-weight: bold;
+    line-height: 1.3;
+    margin: 0 0 2px;
+  }
+  .card-author {
+    font-size: 12px;
+    color: #666;
+    margin: 0 0 6px;
+  }
+  .badges {
+    margin-top: auto;
+    display: flex;
+    gap: 4px;
+    flex-wrap: wrap;
+  }
+  .badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    font-weight: bold;
+  }
+  .badge.type { background: #e0e7f1; color: var(--primary-dark); }
+  .badge.statut.disponible { background: #e6f4ea; color: var(--ok); }
+  .badge.statut.reserve { background: #fff6e0; color: var(--warn); }
+  .badge.statut.emprunte { background: #fdecea; color: var(--busy); }
+
+  /* Fiche détail (overlay) */
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 10;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .overlay.open { display: flex; }
+  .detail {
+    background: white;
+    border-radius: 12px;
+    max-width: 480px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 20px;
+    position: relative;
+  }
+  .detail .close {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    font-size: 22px;
+    cursor: pointer;
+    color: #999;
+    background: none;
+    border: none;
+  }
+  .detail img {
+    width: 140px;
+    float: left;
+    margin: 0 14px 10px 0;
+    border-radius: 6px;
+  }
+  .detail h2 {
+    margin: 0 0 4px;
+    font-size: 18px;
+    color: var(--primary-dark);
+  }
+  .detail .author { color: #666; margin: 0 0 8px; }
+  .detail .meta { font-size: 13px; color: #555; margin: 4px 0; }
+  .detail .resume { clear: both; padding-top: 10px; font-size: 14px; line-height: 1.5; }
+  .empty {
+    text-align: center;
+    color: #888;
+    padding: 40px 0;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>📚 Bibliothèque du CE</h1>
+  <div class="subtitle" id="counter">Chargement du catalogue...</div>
+</header>
+
+<div class="controls">
+  <input type="text" id="search" placeholder="Rechercher un titre ou un auteur...">
+  <select id="filterType"><option value="">Tous les types</option></select>
+  <select id="filterGenre"><option value="">Tous les genres</option></select>
+  <select id="filterAuteur"><option value="">Tous les auteurs</option></select>
+  <select id="filterStatut"><option value="">Tous les statuts</option></select>
+</div>
+
+<div id="grid" class="grid"></div>
+<div id="emptyMsg" class="empty" style="display:none">Aucun livre ne correspond à ta recherche.</div>
+
+<div class="overlay" id="overlay">
+  <div class="detail">
+    <button class="close" onclick="closeDetail()">×</button>
+    <div id="detailContent"></div>
+  </div>
+</div>
+
+<script>
+  // ⚠️ À MODIFIER : colle ici l'URL de ton déploiement Apps Script (se termine par /exec)
+  var APPS_SCRIPT_URL = 'https://script.google.com/macros/s/COLLE_TON_ID_ICI/exec';
+
+  var allBooks = [];
+
+  function statutClass(s) {
+    s = (s || '').toLowerCase();
+    if (s.indexOf('dispo') === 0) return 'disponible';
+    if (s.indexOf('reserv') === 0) return 'reserve';
+    if (s.indexOf('emprunt') === 0) return 'emprunte';
+    return '';
+  }
+
+  function loadCatalog() {
+    fetch(APPS_SCRIPT_URL + '?action=catalog')
+      .then(function(r) { return r.json(); })
+      .then(function(books) {
+        allBooks = books;
+        populateFilters(books);
+        render();
+      })
+      .catch(function(err) {
+        document.getElementById('counter').innerText = 'Erreur de chargement : ' + err.message;
+      });
+  }
+
+  function populateFilters(books) {
+    var types = [...new Set(books.map(function(b){return b.type;}).filter(Boolean))].sort();
+    var genres = [...new Set(books.map(function(b){return b.genre;}).filter(Boolean))].sort();
+    var auteurs = [...new Set(books.map(function(b){return b.auteur;}).filter(Boolean))].sort();
+    var statuts = [...new Set(books.map(function(b){return b.statut;}).filter(Boolean))].sort();
+
+    fillSelect('filterType', types);
+    fillSelect('filterGenre', genres);
+    fillSelect('filterAuteur', auteurs);
+    fillSelect('filterStatut', statuts);
+  }
+
+  function fillSelect(id, values) {
+    var sel = document.getElementById(id);
+    values.forEach(function(v) {
+      var opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v;
+      sel.appendChild(opt);
+    });
+  }
+
+  function render() {
+    var q = document.getElementById('search').value.trim().toLowerCase();
+    var fType = document.getElementById('filterType').value;
+    var fGenre = document.getElementById('filterGenre').value;
+    var fAuteur = document.getElementById('filterAuteur').value;
+    var fStatut = document.getElementById('filterStatut').value;
+
+    var filtered = allBooks.filter(function(b) {
+      if (fType && b.type !== fType) return false;
+      if (fGenre && b.genre !== fGenre) return false;
+      if (fAuteur && b.auteur !== fAuteur) return false;
+      if (fStatut && b.statut !== fStatut) return false;
+      if (q) {
+        var hay = (b.titre + ' ' + b.auteur).toLowerCase();
+        if (hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+
+    document.getElementById('counter').innerText =
+      allBooks.length + ' ouvrages au catalogue — ' + filtered.length + ' affiché(s)';
+
+    var grid = document.getElementById('grid');
+    grid.innerHTML = '';
+    document.getElementById('emptyMsg').style.display = filtered.length ? 'none' : 'block';
+
+    filtered.forEach(function(b) {
+      var card = document.createElement('div');
+      card.className = 'card';
+      card.onclick = function() { openDetail(b); };
+      card.innerHTML =
+        '<img src="' + (b.jaquette || '') + '" alt="" onerror="this.style.opacity=0.3">' +
+        '<div class="card-body">' +
+          '<p class="card-title">' + escapeHtml(b.titre) + '</p>' +
+          '<p class="card-author">' + escapeHtml(b.auteur) + '</p>' +
+          '<div class="badges">' +
+            (b.type ? '<span class="badge type">' + escapeHtml(b.type) + '</span>' : '') +
+            (b.statut ? '<span class="badge statut ' + statutClass(b.statut) + '">' + escapeHtml(b.statut) + '</span>' : '') +
+          '</div>' +
+        '</div>';
+      grid.appendChild(card);
+    });
+  }
+
+  function openDetail(b) {
+    document.getElementById('detailContent').innerHTML =
+      '<img src="' + (b.jaquette || '') + '" alt="">' +
+      '<h2>' + escapeHtml(b.titre) + '</h2>' +
+      '<p class="author">' + escapeHtml(b.auteur) + '</p>' +
+      '<p class="meta"><strong>Type :</strong> ' + escapeHtml(b.type || '—') + '</p>' +
+      '<p class="meta"><strong>Genre :</strong> ' + escapeHtml(b.genre || '—') + '</p>' +
+      '<p class="meta"><strong>Statut :</strong> ' + escapeHtml(b.statut || '—') + '</p>' +
+      '<p class="resume">' + escapeHtml(b.resume || 'Pas de résumé disponible.') + '</p>';
+    document.getElementById('overlay').classList.add('open');
+  }
+
+  function closeDetail() {
+    document.getElementById('overlay').classList.remove('open');
+  }
+
+  function escapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, function(c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+    });
+  }
+
+  document.getElementById('search').addEventListener('input', render);
+  document.getElementById('filterType').addEventListener('change', render);
+  document.getElementById('filterGenre').addEventListener('change', render);
+  document.getElementById('filterAuteur').addEventListener('change', render);
+  document.getElementById('filterStatut').addEventListener('change', render);
+  document.getElementById('overlay').addEventListener('click', function(e) {
+    if (e.target === this) closeDetail();
+  });
+
+  loadCatalog();
+</script>
+</body>
+</html>
