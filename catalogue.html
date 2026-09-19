@@ -90,6 +90,29 @@
     margin-bottom: 10px;
   }
 
+  /* Rangée de pastilles de tags cliquables, sous la barre de recherche */
+  .tag-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin: -6px 0 16px;
+  }
+  .tag-pill {
+    font-size: 12px;
+    padding: 5px 12px;
+    border-radius: 14px;
+    border: 1px solid #ccc;
+    background: white;
+    color: #444;
+    cursor: pointer;
+    user-select: none;
+  }
+  .tag-pill.active {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: white;
+  }
+
   /* ============================================================
      GRILLE DE LIVRES
      "grid" = grille CSS : auto-fill place autant de colonnes que
@@ -254,6 +277,9 @@
   <select id="filterStatut"><option value="">Tous les statuts</option></select>
 </div>
 
+<!-- Rangée de pastilles de tags, remplie dynamiquement (voir populateFilters) -->
+<div id="tagFilters" class="tag-filters"></div>
+
 <!-- La grille de livres est vide au départ : le JavaScript la remplit
      avec une carte par livre (fonction render). -->
 <div id="grid" class="grid"></div>
@@ -287,6 +313,18 @@
   // On le garde en mémoire pour pouvoir filtrer/rechercher sans
   // devoir redemander les données à chaque frappe au clavier.
   var allBooks = [];
+
+  // Ensemble des tags actuellement sélectionnés dans le filtre pastilles
+  var selectedTags = new Set();
+
+  // Découpe la chaîne "Tag1, Tag2, Tag3" (stockée dans le Sheet) en
+  // tableau ["Tag1","Tag2","Tag3"], en retirant les espaces superflus.
+  function parseTags(tagString) {
+    return (tagString || '')
+      .split(',')
+      .map(function(t) { return t.trim(); })
+      .filter(Boolean);
+  }
 
   // Convertit le texte du statut ("Disponible", "Réservé"...) en un
   // nom de classe CSS ("disponible", "reserve"...) utilisé pour la couleur du badge.
@@ -331,6 +369,31 @@
     fillSelect('filterGenre', genres);
     fillSelect('filterAuteur', auteurs);
     fillSelect('filterStatut', statuts);
+
+    // Tags : on récupère tous les tags de tous les livres, uniques et triés,
+    // puis on crée une pastille cliquable par tag.
+    var allTags = new Set();
+    books.forEach(function(b) { parseTags(b.tags).forEach(function(t) { allTags.add(t); }); });
+
+    var tagContainer = document.getElementById('tagFilters');
+    tagContainer.innerHTML = '';
+    [...allTags].sort().forEach(function(tag) {
+      var pill = document.createElement('span');
+      pill.className = 'tag-pill';
+      pill.textContent = tag;
+      pill.onclick = function() {
+        // Clic sur une pastille : bascule sa sélection puis rafraîchit l'affichage
+        if (selectedTags.has(tag)) {
+          selectedTags.delete(tag);
+          pill.classList.remove('active');
+        } else {
+          selectedTags.add(tag);
+          pill.classList.add('active');
+        }
+        render();
+      };
+      tagContainer.appendChild(pill);
+    });
   }
 
   // Ajoute une <option> par valeur dans le <select> désigné par son id.
@@ -364,6 +427,13 @@
       if (fGenre && b.genre !== fGenre) return false;
       if (fAuteur && b.auteur !== fAuteur) return false;
       if (fStatut && b.statut !== fStatut) return false;
+      // Tags : si des pastilles sont sélectionnées, on garde le livre s'il
+      // possède AU MOINS UN des tags cochés (logique "OU").
+      if (selectedTags.size > 0) {
+        var bookTags = parseTags(b.tags);
+        var hasOne = bookTags.some(function(t) { return selectedTags.has(t); });
+        if (!hasOne) return false;
+      }
       if (q) {
         var hay = (b.titre + ' ' + b.auteur).toLowerCase();
         if (hay.indexOf(q) === -1) return false;
@@ -411,6 +481,7 @@
       '<p class="author">' + escapeHtml(b.auteur) + '</p>' +
       '<p class="meta"><strong>Type :</strong> ' + escapeHtml(b.type || '—') + '</p>' +
       '<p class="meta"><strong>Genre :</strong> ' + escapeHtml(b.genre || '—') + '</p>' +
+      (parseTags(b.tags).length ? '<p class="meta"><strong>Tags :</strong> ' + escapeHtml(parseTags(b.tags).join(', ')) + '</p>' : '') +
       '<p class="meta"><strong>Statut :</strong> ' + escapeHtml(b.statut || '—') + '</p>' +
       '<p class="resume">' + escapeHtml(b.resume || 'Pas de résumé disponible.') + '</p>';
     document.getElementById('overlay').classList.add('open'); // rend la fiche visible (voir CSS .overlay.open)
