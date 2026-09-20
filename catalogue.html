@@ -248,6 +248,42 @@
     color: #888;
     padding: 40px 0;
   }
+
+  /* Bloc de réservation affiché dans la fiche détail, uniquement pour
+     les livres actuellement disponibles (voir openDetail plus bas) */
+  .reserve-box {
+    clear: both;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid #eee;
+  }
+  .reserve-title {
+    font-weight: bold;
+    font-size: 14px;
+    margin: 0 0 8px;
+  }
+  .reserve-box input {
+    width: 100%;
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  .reserve-box button {
+    background: var(--primary);
+    color: white;
+    border: none;
+    padding: 9px 16px;
+    border-radius: 6px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .reserve-box button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .reserve-msg { font-size: 13px; margin-top: 8px; }
+  .reserve-msg.ok { color: var(--ok); }
+  .reserve-msg.warn { color: var(--warn); }
+  .reserve-msg.err { color: var(--busy); }
 </style>
 </head>
 <body>
@@ -259,6 +295,10 @@
 <header>
   <h1>📚 Bibliothèque du CE Ambarès</h1>
   <div class="subtitle" id="counter">Chargement du catalogue...</div>
+  <!-- Lien vers la nouvelle page infos.html (contacts, horaires, modalités) -->
+  <div style="margin-top:8px">
+    <a href="infos.html" style="font-size:13px;color:var(--primary-dark);font-weight:bold;text-decoration:none">ℹ️ Infos pratiques</a>
+  </div>
 </header>
 
 <!-- ============================================================
@@ -485,11 +525,63 @@
       (b.editeur ? '<p class="meta"><strong>Éditeur :</strong> ' + escapeHtml(b.editeur) + '</p>' : '') +
       (b.datePublication ? '<p class="meta"><strong>Publication :</strong> ' + escapeHtml(b.datePublication) + '</p>' : '') +
       (b.pages ? '<p class="meta"><strong>Pages :</strong> ' + escapeHtml(b.pages) + '</p>' : '') +
-      '<p class="meta"><strong>Statut :</strong> ' + escapeHtml(b.statut || '—') + '</p>' +
+      '<p class="meta"><strong>Statut :</strong> <span id="detailStatut">' + escapeHtml(b.statut || '—') + '</span></p>' +
       (b.resume ? '<p class="resume">' + escapeHtml(b.resume) + '</p>' : '') +
       (b.resumeComplet ? '<p class="resume"><strong>4e de couverture :</strong><br>' + escapeHtml(b.resumeComplet) + '</p>' : '') +
-      (!b.resume && !b.resumeComplet ? '<p class="resume">Pas de résumé disponible.</p>' : '');
+      (!b.resume && !b.resumeComplet ? '<p class="resume">Pas de résumé disponible.</p>' : '') +
+      '<div id="reserveZone"></div>';
+
+    // N'affiche le formulaire de réservation que si le livre est actuellement disponible
+    if (statutClass(b.statut) === 'disponible') {
+      document.getElementById('reserveZone').innerHTML =
+        '<div class="reserve-box">' +
+          '<p class="reserve-title">Réserver ce livre</p>' +
+          '<input type="text" id="resNom" placeholder="Votre nom">' +
+          '<button id="resBtn" onclick="reserverLivre(\'' + b.isbn + '\')">Réserver</button>' +
+          '<div id="resStatus"></div>' +
+        '</div>';
+    }
+
     document.getElementById('overlay').classList.add('open'); // rend la fiche visible (voir CSS .overlay.open)
+  }
+
+  // Envoie la demande de réservation au backend (doPost côté Apps Script),
+  // qui vérifie que le livre est toujours disponible avant de l'enregistrer.
+  function reserverLivre(isbn) {
+    var nom = document.getElementById('resNom').value.trim();
+    var statusDiv = document.getElementById('resStatus');
+
+    if (!nom) {
+      statusDiv.innerHTML = '<p class="reserve-msg err">Merci de renseigner ton nom.</p>';
+      return;
+    }
+
+    document.getElementById('resBtn').disabled = true;
+    statusDiv.innerHTML = '<p class="reserve-msg warn">Réservation en cours...</p>';
+
+    fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' }, // évite le pré-vol CORS
+      body: JSON.stringify({ isbn: isbn, nom: nom })
+    })
+      .then(function(r) { return r.json(); })
+      .then(function(res) {
+        if (res.status === 'ok') {
+          statusDiv.innerHTML = '<p class="reserve-msg ok">✅ Réservé ! Tu recevras des nouvelles de la bibliothèque prochainement.</p>';
+          document.getElementById('detailStatut').textContent = 'Réservé';
+          loadCatalog(); // rafraîchit la grille pour que le badge du livre se mette à jour
+        } else if (res.status === 'unavailable') {
+          statusDiv.innerHTML = '<p class="reserve-msg err">Ce livre vient d\'être réservé par quelqu\'un d\'autre entre-temps.</p>';
+          loadCatalog();
+        } else {
+          statusDiv.innerHTML = '<p class="reserve-msg err">❌ ' + (res.message || 'Erreur inconnue.') + '</p>';
+          document.getElementById('resBtn').disabled = false;
+        }
+      })
+      .catch(function(err) {
+        statusDiv.innerHTML = '<p class="reserve-msg err">❌ Erreur réseau : ' + err.message + '</p>';
+        document.getElementById('resBtn').disabled = false;
+      });
   }
 
   function closeDetail() {
