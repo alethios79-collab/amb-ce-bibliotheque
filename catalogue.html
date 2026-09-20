@@ -567,7 +567,7 @@
       .then(function(r) { return r.json(); })
       .then(function(res) {
         if (res.status === 'ok') {
-          statusDiv.innerHTML = '<p class="reserve-msg ok">✅ Réservé ! Tu recevras des nouvelles de la bibliothèque prochainement.</p>';
+          statusDiv.innerHTML = '<p class="reserve-msg ok">✅ Réservé ! Tu peux venir le chercher dès la prochaine ouverture 😉</p>';
           document.getElementById('detailStatut').textContent = 'Réservé';
           loadCatalog(); // rafraîchit la grille pour que le badge du livre se mette à jour
         } else if (res.status === 'unavailable') {
