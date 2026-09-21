@@ -297,7 +297,7 @@
   <div class="subtitle" id="counter">Chargement du catalogue...</div>
   <!-- Lien vers la nouvelle page infos.html (contacts, horaires, modalités) -->
   <div style="margin-top:8px">
-    <a href="infos.html" style="font-size:13px;color:#4287f5;font-weight:bold;text-decoration:none">ℹ️ Infos pratiques</a>
+    <a href="infos.html" style="font-size:13px;color:var(--primary-dark);font-weight:bold;text-decoration:none">ℹ️ Infos pratiques</a>
   </div>
 </header>
 
@@ -357,6 +357,10 @@
   // Ensemble des tags actuellement sélectionnés dans le filtre pastilles
   var selectedTags = new Set();
 
+  // Ordre de référence des tags, chargé depuis l'onglet Tags/Listes du Sheet
+  // (voir loadCatalog) — utilisé pour trier les pastilles autrement qu'alphabétiquement.
+  var tagOrder = [];
+
   // Découpe la chaîne "Tag1, Tag2, Tag3" (stockée dans le Sheet) en
   // tableau ["Tag1","Tag2","Tag3"], en retirant les espaces superflus.
   function parseTags(tagString) {
@@ -378,16 +382,21 @@
 
   // ============================================================
   // CHARGEMENT DES DONNÉES
-  // Appelle l'API Apps Script, récupère la liste des livres en JSON,
-  // puis déclenche l'affichage.
+  // Appelle l'API Apps Script, récupère la liste des livres ET l'ordre
+  // de référence des tags en parallèle, puis déclenche l'affichage.
   // ============================================================
   function loadCatalog() {
-    fetch(APPS_SCRIPT_URL + '?action=catalog')
-      .then(function(r) { return r.json(); })   // convertit la réponse brute en objet JS
-      .then(function(books) {
-        allBooks = books;
-        populateFilters(books);  // remplit les menus déroulants avec les valeurs réelles
-        render();                 // affiche les cartes de livres
+    var catalogPromise = fetch(APPS_SCRIPT_URL + '?action=catalog').then(function(r) { return r.json(); });
+    var tagOrderPromise = fetch(APPS_SCRIPT_URL + '?action=tagorder')
+      .then(function(r) { return r.json(); })
+      .catch(function() { return []; }); // si ça échoue, tri alphabétique par défaut
+
+    Promise.all([catalogPromise, tagOrderPromise])
+      .then(function(results) {
+        allBooks = results[0];
+        tagOrder = results[1] || [];
+        populateFilters(allBooks);
+        render();
       })
       .catch(function(err) {
         // Si la requête échoue (mauvaise URL, pas de réseau...), on affiche l'erreur
@@ -410,14 +419,24 @@
     fillSelect('filterAuteur', auteurs);
     fillSelect('filterStatut', statuts);
 
-    // Tags : on récupère tous les tags de tous les livres, uniques et triés,
-    // puis on crée une pastille cliquable par tag.
+    // Tags : on récupère tous les tags de tous les livres (uniques), puis on
+    // les trie selon tagOrder (ordre de l'onglet Tags/Listes) plutôt
+    // qu'alphabétiquement. Un tag absent de cette liste passe en dernier.
     var allTags = new Set();
     books.forEach(function(b) { parseTags(b.tags).forEach(function(t) { allTags.add(t); }); });
 
+    var sortedTags = [...allTags].sort(function(a, b) {
+      var ia = tagOrder.indexOf(a);
+      var ib = tagOrder.indexOf(b);
+      if (ia === -1 && ib === -1) return a.localeCompare(b);
+      if (ia === -1) return 1;
+      if (ib === -1) return -1;
+      return ia - ib;
+    });
+
     var tagContainer = document.getElementById('tagFilters');
     tagContainer.innerHTML = '';
-    [...allTags].sort().forEach(function(tag) {
+    sortedTags.forEach(function(tag) {
       var pill = document.createElement('span');
       pill.className = 'tag-pill';
       pill.textContent = tag;
@@ -567,7 +586,7 @@
       .then(function(r) { return r.json(); })
       .then(function(res) {
         if (res.status === 'ok') {
-          statusDiv.innerHTML = '<p class="reserve-msg ok">✅ Réservé ! Tu peux venir le chercher dès la prochaine ouverture 😉</p>';
+          statusDiv.innerHTML = '<p class="reserve-msg ok">✅ Réservé ! Tu recevras des nouvelles de la bibliothèque prochainement.</p>';
           document.getElementById('detailStatut').textContent = 'Réservé';
           loadCatalog(); // rafraîchit la grille pour que le badge du livre se mette à jour
         } else if (res.status === 'unavailable') {
