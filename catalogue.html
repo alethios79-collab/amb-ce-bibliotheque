@@ -70,13 +70,21 @@
   }
   .controls input[type=text] {
     flex: 1 1 220px;         /* la barre de recherche prend toute la place restante */
+    min-width: 0;            /* empêche le contenu de forcer une largeur minimale plus grande */
     padding: 9px 10px;
     border: 1px solid #ccc;
     border-radius: 6px;
     font-size: 14px;
   }
   .controls select {
-    /* Style des 4 menus déroulants (Type / Genre / Auteur / Statut) */
+    /* Style des 4 menus déroulants (Type / Genre / Auteur / Statut).
+       flex + min-width:0 + max-width:100% empêchent un nom d'auteur très
+       long de forcer le menu à déborder de l'écran sur mobile : par défaut,
+       un élément flex ne rétrécit jamais sous la largeur de son contenu
+       (min-width:auto implicite) sauf si on force min-width:0. */
+    flex: 1 1 140px;
+    min-width: 0;
+    max-width: 100%;
     padding: 9px 10px;
     border: 1px solid #ccc;
     border-radius: 6px;
